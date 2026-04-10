@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Neon 2048 Turbo 🧩</title>
+<style>
+/* --- Core Styling --- */
+* { margin: 0; padding: 0; box-sizing: border-box; touch-action: none; }
+html, body {
+    width: 100%; height: 100%;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    background: #050505;
+    display: flex; justify-content: center; align-items: center;
+    overflow: hidden;
+}
+
+#gameContainer {
+    position: relative;
+    width: min(94vw, 450px);
+    aspect-ratio: 1 / 1.2;
+    display: flex; flex-direction: column;
+}
+
+/* Header */
+.header {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 15px; padding: 0 5px;
+}
+.score-row { display: flex; gap: 10px; }
+.score-container {
+    background: #111; padding: 8px 15px; border-radius: 10px;
+    border: 1px solid #333; text-align: center; min-width: 90px;
+}
+.score-label { font-size: 9px; color: #888; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 2px; }
+.score-value { font-size: 18px; font-weight: 800; color: #00ffcc; }
+.best-value { color: #f368e0; }
+
+/* Grid Background */
+#grid-bg {
+    position: relative;
+    width: 100%; aspect-ratio: 1/1;
+    background: #111; border-radius: 12px;
+    display: grid; grid-template-columns: repeat(4, 1fr);
+    grid-template-rows: repeat(4, 1fr); gap: 12px; padding: 12px;
+    border: 2px solid #222;
+}
+.grid-cell { background: rgba(255,255,255,0.03); border-radius: 8px; }
+
+/* Tile Layer */
+#tile-container {
+    position: absolute; top: 12px; left: 12px;
+    right: 12px; bottom: 12px;
+    pointer-events: none;
+}
+
+.tile {
+    position: absolute;
+    width: calc(25% - 9px); height: calc(25% - 9px);
+    border-radius: 8px;
+    display: flex; justify-content: center; align-items: center;
+    font-size: 24px; font-weight: 800;
+    transition: transform 120ms ease-in-out, background 200ms;
+}
+
+/* Tile Colors */
+.t2 { background: #2a2a2a; color: #eee; }
+.t4 { background: #3a3a3a; color: #eee; }
+.t8 { background: #ff9f43; color: #fff; box-shadow: 0 0 15px rgba(255,159,67,0.3); }
+.t16 { background: #ff6b6b; color: #fff; box-shadow: 0 0 15px rgba(255,107,107,0.3); }
+.t32 { background: #ee5253; color: #fff; }
+.t64 { background: #ff3838; color: #fff; box-shadow: 0 0 20px rgba(255,56,56,0.5); }
+.t128 { background: #0abde3; color: #fff; font-size: 20px; }
+.t256 { background: #48dbfb; color: #fff; font-size: 20px; box-shadow: 0 0 25px rgba(72,219,251,0.5); }
+.t512 { background: #1dd1a1; color: #fff; }
+.t1024 { background: #00ffcc; color: #000; font-size: 16px; }
+.t2048 { background: #f368e0; color: #fff; font-size: 16px; box-shadow: 0 0 30px #f368e0; }
+
+/* Screens */
+.overlay {
+    position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(5,5,5,0.92); backdrop-filter: blur(10px);
+    display: flex; flex-direction: column; justify-content: center; align-items: center;
+    border-radius: 12px; z-index: 100; color: white; text-align: center;
+    padding: 20px;
+}
+.hidden { display: none; }
+
+.btn {
+    margin-top: 25px; padding: 14px 35px; border: none; border-radius: 50px;
+    background: #00ffcc; color: #000; font-weight: bold; cursor: pointer;
+    text-transform: uppercase; letter-spacing: 1px; transition: transform 0.2s;
+}
+.btn:active { transform: scale(0.95); }
+
+.close-btn {
+    width: 45px; height: 45px; background: #1a1a1a;
+    border-radius: 50%; color: #ff4757; font-size: 28px;
+    display: flex; justify-content: center; align-items: center;
+    text-decoration: none; border: 1px solid #333;
+}
+</style>
+</head>
+<body>
+
+<div id="gameContainer">
+    <div class="header">
+        <a href="index.html" class="close-btn">&times;</a>
+        <div class="score-row">
+            <div class="score-container">
+                <div class="score-label">Score</div>
+                <div id="score" class="score-value">0</div>
+            </div>
+            <div class="score-container">
+                <div class="score-label">Best</div>
+                <div id="best-score" class="score-value best-value">0</div>
+            </div>
+        </div>
+    </div>
+
+    <div id="grid-bg">
+        <div class="grid-cell"></div><div class="grid-cell"></div><div class="grid-cell"></div><div class="grid-cell"></div>
+        <div class="grid-cell"></div><div class="grid-cell"></div><div class="grid-cell"></div><div class="grid-cell"></div>
+        <div class="grid-cell"></div><div class="grid-cell"></div><div class="grid-cell"></div><div class="grid-cell"></div>
+        <div class="grid-cell"></div><div class="grid-cell"></div><div class="grid-cell"></div><div class="grid-cell"></div>
+        
+        <div id="tile-container"></div>
+
+        <div id="start-screen" class="overlay">
+            <h1 style="font-size: 32px; color: #00ffcc; margin-bottom: 10px;">NEON 2048</h1>
+            <p style="color: #888; font-size: 14px;">Swipe to merge the data blocks.</p>
+            <p style="color: #f368e0; margin-top: 15px; font-weight: bold;">System Record: <span id="start-best">0</span></p>
+            <button class="btn" onclick="startGame()">Initialize</button>
+        </div>
+
+        <div id="game-over" class="overlay hidden">
+            <h1 style="font-size: 40px; color: #ff4757; margin-bottom: 10px;">LOCKOUT</h1>
+            <p id="final-msg">Memory Buffer Overflow.</p>
+            <div style="margin-top: 15px;">
+                <p style="font-size: 12px; color: #888;">FINAL SCORE</p>
+                <p id="end-score" style="font-size: 24px; color: #00ffcc; font-weight: 800;">0</p>
+            </div>
+            <button class="btn" onclick="startGame()">Reboot System</button>
+        </div>
+    </div>
+</div>
+
+<script>
+let board = Array(16).fill(0);
+let score = 0;
+let highScore = localStorage.getItem('2048NeonBest') || 0;
+const container = document.getElementById('tile-container');
+
+// Initial Load
+document.getElementById('best-score').textContent = highScore;
+document.getElementById('start-best').textContent = highScore;
+
+function startGame() {
+    board = Array(16).fill(0);
+    score = 0;
+    document.getElementById('score').textContent = score;
+    document.getElementById('start-screen').classList.add('hidden');
+    document.getElementById('game-over').classList.add('hidden');
+    spawn(); spawn();
+    render();
+}
+
+function spawn() {
+    let empty = board.map((v, i) => v === 0 ? i : null).filter(v => v !== null);
+    if (empty.length) {
+        board[empty[Math.floor(Math.random() * empty.length)]] = Math.random() < 0.9 ? 2 : 4;
+    }
+}
+
+function render() {
+    container.innerHTML = '';
+    board.forEach((val, i) => {
+        if (val !== 0) {
+            const tile = document.createElement('div');
+            tile.className = `tile t${val}`;
+            tile.textContent = val;
+            const row = Math.floor(i / 4);
+            const col = i % 4;
+            tile.style.transform = `translate(${col * 105}%, ${row * 105}%)`;
+            container.appendChild(tile);
+        }
+    });
+}
+
+function move(dir) {
+    let oldBoard = [...board];
+    for (let i = 0; i < 4; i++) {
+        let line = [];
+        for (let j = 0; j < 4; j++) {
+            if (dir === 'L' || dir === 'R') line.push(board[i * 4 + j]);
+            else line.push(board[j * 4 + i]);
+        }
+        if (dir === 'R' || dir === 'D') line.reverse();
+
+        let nextLine = line.filter(v => v !== 0);
+        for (let j = 0; j < nextLine.length - 1; j++) {
+            if (nextLine[j] === nextLine[j + 1]) {
+                nextLine[j] *= 2;
+                score += nextLine[j];
+                nextLine.splice(j + 1, 1);
+                nextLine.push(0);
+            }
+        }
+        while (nextLine.length < 4) nextLine.push(0);
+        if (dir === 'R' || dir === 'D') nextLine.reverse();
+
+        for (let j = 0; j < 4; j++) {
+            if (dir === 'L' || dir === 'R') board[i * 4 + j] = nextLine[j];
+            else board[j * 4 + i] = nextLine[j];
+        }
+    }
+
+    if (JSON.stringify(oldBoard) !== JSON.stringify(board)) {
+        spawn();
+        updateScores();
+        render();
+        checkLose();
+    }
+}
+
+function updateScores() {
+    document.getElementById('score').textContent = score;
+    if (score > highScore) {
+        highScore = score;
+        localStorage.setItem('2048NeonBest', highScore);
+        document.getElementById('best-score').textContent = highScore;
+        document.getElementById('start-best').textContent = highScore;
+    }
+}
+
+function checkLose() {
+    if (!board.includes(0)) {
+        let canMove = false;
+        for (let i = 0; i < 16; i++) {
+            if ((i % 4 < 3 && board[i] === board[i+1]) || (i < 12 && board[i] === board[i+4])) {
+                canMove = true; break;
+            }
+        }
+        if (!canMove) {
+            document.getElementById('end-score').textContent = score;
+            document.getElementById('game-over').classList.remove('hidden');
+        }
+    }
+}
+
+// Controls
+window.addEventListener('keydown', e => {
+    if (e.key === 'ArrowLeft') move('L');
+    if (e.key === 'ArrowRight') move('R');
+    if (e.key === 'ArrowUp') move('U');
+    if (e.key === 'ArrowDown') move('D');
+});
+
+let tsX, tsY;
+document.addEventListener('touchstart', e => { tsX = e.touches[0].clientX; tsY = e.touches[0].clientY; }, {passive:true});
+document.addEventListener('touchend', e => {
+    let dx = e.changedTouches[0].clientX - tsX;
+    let dy = e.changedTouches[0].clientY - tsY;
+    if (Math.abs(dx) > Math.abs(dy)) {
+        if (Math.abs(dx) > 30) move(dx > 0 ? 'R' : 'L');
+    } else {
+        if (Math.abs(dy) > 30) move(dy > 0 ? 'D' : 'U');
+    }
+}, {passive:true});
+
+</script>
+</body>
+</html>

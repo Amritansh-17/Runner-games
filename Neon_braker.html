@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Neon Breaker 🧱</title>
+<style>
+/* --- Core Styling --- */
+* { margin: 0; padding: 0; box-sizing: border-box; touch-action: none; }
+html, body {
+    width: 100%; height: 100%;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    background: #050505;
+    display: flex; justify-content: center; align-items: center;
+    overflow: hidden;
+}
+
+#gameContainer {
+    position: relative;
+    width: min(96vw, 96vh * 2 / 3);
+    aspect-ratio: 2 / 3;
+    max-width: 450px;
+    background: #000;
+    border: 2px solid #222;
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+canvas { display: block; width: 100%; height: 100%; }
+
+.score-board {
+    position: absolute; top: 15px; left: 15px;
+    display: flex; flex-direction: column; gap: 2px;
+    z-index: 10; pointer-events: none;
+}
+#score { font-size: 22px; font-weight: 900; color: #ff0055; text-shadow: 0 0 10px #ff0055; }
+#bestScore { font-size: 12px; font-weight: bold; color: #00ff88; text-transform: uppercase; letter-spacing: 1px; }
+
+.screen {
+    position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0,0,0,0.9); backdrop-filter: blur(10px);
+    display: flex; flex-direction: column; justify-content: center; align-items: center;
+    z-index: 20; color: white; text-align: center; padding: 20px;
+}
+.screen.hidden { display: none; }
+
+.btn {
+    padding: 15px 40px; font-size: 18px; background: #ff0055;
+    color: #fff; border: none; border-radius: 4px;
+    cursor: pointer; font-weight: bold; margin-top: 20px;
+    transition: transform 0.1s;
+}
+.btn:active { transform: scale(0.95); }
+
+.close-btn {
+    position: absolute; top: 15px; right: 15px;
+    width: 35px; height: 35px; background: rgba(255,255,255,0.1);
+    border-radius: 50%; color: #ff4757; font-size: 24px;
+    display: flex; justify-content: center; align-items: center;
+    text-decoration: none; z-index: 30; pointer-events: auto;
+}
+
+/* Shake Effect */
+.shake { animation: shake 0.2s cubic-bezier(.36,.07,.19,.97) both; }
+@keyframes shake {
+    10%, 90% { transform: translate3d(-1px, 0, 0); }
+    20%, 80% { transform: translate3d(2px, 0, 0); }
+    30%, 50%, 70% { transform: translate3d(-3px, 0, 0); }
+    40%, 60% { transform: translate3d(3px, 0, 0); }
+}
+</style>
+</head>
+<body>
+
+<div id="gameContainer">
+    <div class="score-board">
+        <div id="score">SCORE: 0</div>
+        <div id="bestScore">BEST: 0</div>
+    </div>
+    <canvas id="gameCanvas"></canvas>
+    <a href="index.html" class="close-btn">&times;</a>
+
+    <div class="screen" id="startScreen">
+        <h1 style="color: #ff0055; letter-spacing: 3px; font-size: 38px;">NEON BREAKER</h1>
+        <p style="color: #888; margin-top: 10px;">Slide to move the paddle.<br>Speed increases as bricks break!</p>
+        <button class="btn" onclick="startGame()">LAUNCH</button>
+    </div>
+
+    <div class="screen hidden" id="gameOverScreen">
+        <h1 id="statusText" style="color: #ff4757; font-size: 42px;">BRICKED</h1>
+        <p id="finalScore" style="margin-top: 10px; font-size: 20px;"></p>
+        <p id="newRecord" style="color: #00ff88; font-weight: 900; margin-top: 5px; display: none;">NEW HIGH SCORE!</p>
+        <button class="btn" onclick="startGame()">RETRY</button>
+    </div>
+</div>
+
+<script>
+const canvas = document.getElementById('gameCanvas');
+const container = document.getElementById('gameContainer');
+const ctx = canvas.getContext('2d');
+const scoreEl = document.getElementById('score');
+const bestEl = document.getElementById('bestScore');
+
+let gameState = 'START';
+let score = 0;
+let highScore = localStorage.getItem('neonBreakerBest') || 0;
+let bricks = [];
+const rowCount = 6;
+const colCount = 7;
+const paddle = { w: 85, h: 12, x: 157 };
+const ball = { x: 200, y: 500, dx: 3, dy: -3, r: 7, baseSpeed: 4.5 };
+
+bestEl.textContent = `BEST: ${highScore}`;
+
+function resize() {
+    canvas.width = 400;
+    canvas.height = 600;
+}
+
+function triggerShake() {
+    container.classList.remove('shake');
+    void container.offsetWidth; // trigger reflow
+    container.classList.add('shake');
+}
+
+function startGame() {
+    score = 0;
+    scoreEl.textContent = "SCORE: 0";
+    ball.x = 200; ball.y = 500;
+    ball.dx = (Math.random() - 0.5) * 4;
+    ball.dy = -ball.baseSpeed;
+    paddle.x = 157;
+    
+    bricks = [];
+    for(let r=0; r<rowCount; r++) {
+        for(let c=0; c<colCount; c++) {
+            bricks.push({
+                x: c * 54 + 11,
+                y: r * 25 + 70,
+                status: 1,
+                color: `hsl(${r * 45}, 100%, 55%)`
+            });
+        }
+    }
+    
+    gameState = 'PLAYING';
+    document.getElementById('startScreen').classList.add('hidden');
+    document.getElementById('gameOverScreen').classList.add('hidden');
+    document.getElementById('newRecord').style.display = 'none';
+}
+
+function update() {
+    if (gameState !== 'PLAYING') return;
+
+    ball.x += ball.dx;
+    ball.y += ball.dy;
+
+    // Wall bounces
+    if (ball.x + ball.r > 400 || ball.x - ball.r < 0) {
+        ball.dx *= -1;
+        ball.x = ball.x < ball.r ? ball.r : 400 - ball.r;
+    }
+    if (ball.y - ball.r < 0) {
+        ball.dy *= -1;
+        ball.y = ball.r;
+    }
+
+    // Paddle collision
+    if (ball.y + ball.r > 570 && ball.y - ball.r < 582) {
+        if (ball.x > paddle.x && ball.x < paddle.x + paddle.w) {
+            triggerShake();
+            let hitPos = (ball.x - (paddle.x + paddle.w / 2)) / (paddle.w / 2);
+            let speed = Math.sqrt(ball.dx**2 + ball.dy**2);
+            ball.dx = hitPos * 5;
+            ball.dy = -Math.abs(Math.sqrt(Math.max(speed**2 - ball.dx**2, 16)));
+            ball.y = 570 - ball.r;
+        }
+    }
+
+    // Brick collision
+    bricks.forEach(b => {
+        if (b.status === 1) {
+            if (ball.x + ball.r > b.x && ball.x - ball.r < b.x + 50 &&
+                ball.y + ball.r > b.y && ball.y - ball.r < b.y + 20) {
+                
+                b.status = 0;
+                ball.dy *= -1.02; // Slight speed up
+                ball.dx *= 1.02;
+                score += 10;
+                scoreEl.textContent = `SCORE: ${score}`;
+                triggerShake();
+
+                if (bricks.every(brick => brick.status === 0)) endGame(true);
+            }
+        }
+    });
+
+    if (ball.y > 620) endGame(false);
+}
+
+function draw() {
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, 400, 600);
+
+    // Bricks
+    bricks.forEach(b => {
+        if (b.status === 1) {
+            ctx.shadowBlur = 12; ctx.shadowColor = b.color;
+            ctx.fillStyle = b.color;
+            ctx.fillRect(b.x, b.y, 50, 20);
+        }
+    });
+
+    // Paddle
+    ctx.shadowBlur = 15; ctx.shadowColor = '#fff';
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(paddle.x, 570, paddle.w, paddle.h);
+
+    // Ball
+    ctx.shadowBlur = 10; ctx.shadowColor = '#00ffff';
+    ctx.fillStyle = '#00ffff';
+    ctx.beginPath();
+    ctx.arc(ball.x, ball.y, ball.r, 0, Math.PI*2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+}
+
+function endGame(win) {
+    if (gameState === 'GAME_OVER') return;
+    gameState = 'GAME_OVER';
+    
+    let isNewRecord = false;
+    if (score > highScore) {
+        highScore = score;
+        localStorage.setItem('neonBreakerBest', highScore);
+        bestEl.textContent = `BEST: ${highScore}`;
+        isNewRecord = true;
+    }
+
+    document.getElementById('statusText').textContent = win ? "CLEARED!" : "BRICKED";
+    document.getElementById('statusText').style.color = win ? "#00ff88" : "#ff0055";
+    document.getElementById('finalScore').textContent = `Total Score: ${score}`;
+    document.getElementById('newRecord').style.display = isNewRecord ? 'block' : 'none';
+    document.getElementById('gameOverScreen').classList.remove('hidden');
+}
+
+function loop() {
+    update();
+    draw();
+    requestAnimationFrame(loop);
+}
+
+const handleMove = (clientX) => {
+    if (gameState !== 'PLAYING') return;
+    const rect = canvas.getBoundingClientRect();
+    const x = (clientX - rect.left) * (400 / rect.width);
+    paddle.x = Math.max(0, Math.min(400 - paddle.w, x - paddle.w / 2));
+};
+
+canvas.addEventListener('mousemove', e => handleMove(e.clientX));
+canvas.addEventListener('touchstart', e => {
+    e.preventDefault();
+    handleMove(e.touches[0].clientX);
+}, {passive:false});
+canvas.addEventListener('touchmove', e => {
+    e.preventDefault();
+    handleMove(e.touches[0].clientX);
+}, {passive:false});
+
+resize();
+loop();
+</script>
+</body>
+</html>

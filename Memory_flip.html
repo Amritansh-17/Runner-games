@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>🧠 Emoji Memory Match</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+    
+    * {
+      box-sizing: border-box;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+    }
+    
+    body {
+      font-family: 'Press Start 2P', cursive;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      margin: 0;
+      padding: 10px;
+      user-select: none;
+    }
+    
+    .game-container {
+      position: relative;
+      width: min(95vw, 500px);
+      aspect-ratio: 1;
+      background: rgba(255, 255, 255, 0.95);
+      border-radius: 20px;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+      padding: 15px;
+      display: flex;
+      flex-direction: column;
+    }
+    
+    /* ✅ CLOSE BUTTON */
+.close-btn {
+  position: absolute; top: 15px; right: 15px;
+  width: 40px; height: 40px;
+  background: rgba(255, 255, 255, 0.2);
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  border-radius: 50%;
+  color: #ff4757; font-size: 27px; font-weight: bold;
+  display: flex; justify-content: center; align-items: center;
+  text-decoration: none; cursor: pointer; transition: all 0.2s;
+  z-index: 30; font-family: system-ui, sans-serif; user-select: none;
+  backdrop-filter: blur(4px);
+}
+.close-btn:hover { background: rgba(255, 255, 255, 0.35); transform: scale(1.1); }
+.close-btn:active { transform: scale(0.95); }
+    
+    /* Screens */
+    .screen {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      padding: 20px;
+      z-index: 20;
+      background: rgba(102, 126, 234, 0.95);
+      border-radius: 16px;
+      transition: opacity 0.3s ease;
+    }
+    
+    .screen.hidden {
+      display: none;
+    }
+    
+    .screen h1 {
+      color: white;
+      font-size: clamp(16px, 4vw, 24px);
+      margin-bottom: 20px;
+      text-shadow: 2px 2px 0 rgba(0,0,0,0.2);
+      line-height: 1.4;
+    }
+    
+    .screen p {
+      color: rgba(255,255,255,0.9);
+      font-size: clamp(10px, 2.5vw, 14px);
+      margin: 8px 0;
+      line-height: 1.6;
+    }
+    
+    .stats {
+      display: flex;
+      gap: 15px;
+      margin: 15px 0;
+      color: white;
+      font-size: clamp(10px, 2.5vw, 13px);
+    }
+    
+    .stat-box {
+      background: rgba(255,255,255,0.2);
+      padding: 8px 15px;
+      border-radius: 10px;
+      min-width: 80px;
+    }
+    
+    .stat-value {
+      font-size: 1.3em;
+      color: #FFD700;
+    }
+    
+    /* Buttons */
+    .btn {
+      background: linear-gradient(135deg, #FFD700, #FFA500);
+      color: #333;
+      border: none;
+      padding: 12px 30px;
+      font-size: clamp(12px, 3vw, 16px);
+      font-family: 'Press Start 2P', cursive;
+      border-radius: 50px;
+      cursor: pointer;
+      margin-top: 20px;
+      transition: all 0.2s ease;
+      box-shadow: 0 5px 0 #cc8400;
+      min-width: 160px;
+      font-weight: bold;
+    }
+    
+    .btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 7px 0 #cc8400;
+      filter: brightness(1.05);
+    }
+    
+    .btn:active {
+      transform: translateY(3px);
+      box-shadow: 0 2px 0 #cc8400;
+    }
+    
+    /* Game Board */
+    .game-board {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+      width: 100%;
+      aspect-ratio: 1;
+      padding: 10px;
+    }
+    
+    /* Cards */
+    .card {
+      position: relative;
+      aspect-ratio: 1;
+      cursor: pointer;
+      perspective: 1000px;
+      transform-style: preserve-3d;
+      transition: transform 0.4s ease;
+    }
+    
+    .card.flipped {
+      transform: rotateY(180deg);
+    }
+    
+    .card.matched {
+      cursor: default;
+      animation: pulse 0.3s ease;
+    }
+    
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.05); }
+    }
+    
+    .card-face {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      backface-visibility: hidden;
+      border-radius: 12px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-size: clamp(24px, 6vw, 40px);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      transition: all 0.2s ease;
+    }
+    
+    .card-front {
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      border: 3px solid rgba(255,255,255,0.3);
+    }
+    
+    .card-front::before {
+      content: "❓";
+      font-size: 0.8em;
+      opacity: 0.7;
+    }
+    
+    .card-back {
+      background: white;
+      border: 3px solid #667eea;
+      transform: rotateY(180deg);
+    }
+    
+    .card:hover:not(.flipped):not(.matched) .card-front {
+      transform: scale(1.03);
+      box-shadow: 0 6px 20px rgba(0,0,0,0.25);
+    }
+    
+    .card.matched .card-back {
+      background: linear-gradient(135deg, #a8edea, #fed6e3);
+      border-color: #4ade80;
+      animation: matchedGlow 0.5s ease;
+    }
+    
+    @keyframes matchedGlow {
+      0%, 100% { box-shadow: 0 0 0 rgba(74, 222, 128, 0); }
+      50% { box-shadow: 0 0 20px rgba(74, 222, 128, 0.6); }
+    }
+    
+    /* Mobile optimizations */
+    @media (max-width: 480px) {
+      .game-container {
+        padding: 10px;
+        border-radius: 16px;
+      }
+      .game-board {
+        gap: 8px;
+        padding: 8px;
+      }
+    }
+    
+    /* Confetti animation for win */
+    .confetti {
+      position: absolute;
+      width: 10px;
+      height: 10px;
+      background: #ffd700;
+      animation: fall 3s linear forwards;
+      border-radius: 2px;
+      z-index: 25;
+      pointer-events: none;
+    }
+    
+    @keyframes fall {
+      to {
+        transform: translateY(600px) rotate(720deg);
+        opacity: 0;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="game-container">
+    <!-- ✅ CLOSE BUTTON -->
+    <a href="index.html" class="close-btn" title="Back to Home">&times;</a>
+    
+    <!-- START SCREEN -->
+    <div class="screen" id="start-screen">
+      <h1>🧠 EMOJI<br>MATCH<br>GAME</h1>
+      <p>Find all matching pairs!</p>
+      <p>Tap cards to flip them</p>
+      <div class="stats">
+        <div class="stat-box">Moves: <span class="stat-value" id="start-moves">0</span></div>
+        <div class="stat-box">Best: <span class="stat-value" id="start-best">--</span></div>
+      </div>
+      <button class="btn" id="start-btn">▶ START GAME</button>
+    </div>
+    
+    <!-- GAME OVER SCREEN -->
+    <div class="screen hidden" id="game-over-screen">
+      <h1>🎉 YOU WIN! 🎉</h1>
+      <p>All pairs matched!</p>
+      <div class="stats">
+        <div class="stat-box">Moves: <span class="stat-value" id="final-moves">0</span></div>
+        <div class="stat-box">Time: <span class="stat-value" id="final-time">0s</span></div>
+        <div class="stat-box">Best: <span class="stat-value" id="final-best">--</span></div>
+      </div>
+      <button class="btn" id="restart-btn">🔄 PLAY AGAIN</button>
+    </div>
+    
+    <!-- GAME BOARD -->
+    <div class="game-board" id="game-board"></div>
+  </div>
+
+  <script>
+    // ===== GAME CONFIG =====
+    const EMOJIS = ['🐶', '🐱', '🐭', '🐹', '🐰', '🦊', '🐻', '🐼'];
+    const GRID_SIZE = 4; // 4x4 = 16 cards = 8 pairs
+    const FLIP_DELAY = 1000;
+    
+    // ===== GAME STATE =====
+    let cards = [];
+    let flippedCards = [];
+    let matchedPairs = 0;
+    let moves = 0;
+    let gameActive = false;
+    let lockBoard = false;
+    let startTime = null;
+    let timerInterval = null;
+    let bestScore = localStorage.getItem('emojiMemoryBest') || null;
+    
+    // ===== DOM ELEMENTS =====
+    const gameBoard = document.getElementById('game-board');
+    const startScreen = document.getElementById('start-screen');
+    const gameOverScreen = document.getElementById('game-over-screen');
+    const startBtn = document.getElementById('start-btn');
+    const restartBtn = document.getElementById('restart-btn');
+    const startMovesEl = document.getElementById('start-moves');
+    const startBestEl = document.getElementById('start-best');
+    const finalMovesEl = document.getElementById('final-moves');
+    const finalTimeEl = document.getElementById('final-time');
+    const finalBestEl = document.getElementById('final-best');
+    
+    // Initialize best score display
+    if (bestScore) {
+      startBestEl.textContent = bestScore;
+      finalBestEl.textContent = bestScore;
+    }
+    
+    // ===== CARD CREATION =====
+    function createCards() {
+      // Create pairs and shuffle
+      const cardValues = [...EMOJIS, ...EMOJIS];
+      shuffle(cardValues);
+      
+      gameBoard.innerHTML = '';
+      cards = [];
+      
+      cardValues.forEach((emoji, index) => {
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.dataset.index = index;
+        card.dataset.value = emoji;
+        
+        card.innerHTML = `
+          <div class="card-face card-front"></div>
+          <div class="card-face card-back">${emoji}</div>
+        `;
+        
+        card.addEventListener('click', () => flipCard(card));
+        card.addEventListener('touchstart', (e) => {
+          e.preventDefault();
+          flipCard(card);
+        }, { passive: false });
+        
+        gameBoard.appendChild(card);
+        cards.push(card);
+      });
+    }
+    
+    // Fisher-Yates shuffle
+    function shuffle(array) {
+      for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+      }
+      return array;
+    }
+    
+    // ===== CARD FLIP LOGIC =====
+    function flipCard(card) {
+      // Prevent invalid actions
+      if (lockBoard) return;
+      if (card.classList.contains('flipped') || card.classList.contains('matched')) return;
+      if (!gameActive) return;
+      
+      // Flip the card
+      card.classList.add('flipped');
+      flippedCards.push(card);
+      
+      // Check for match when two cards are flipped
+      if (flippedCards.length === 2) {
+        moves++;
+        checkForMatch();
+      }
+    }
+    
+    function checkForMatch() {
+      lockBoard = true;
+      const [card1, card2] = flippedCards;
+      const isMatch = card1.dataset.value === card2.dataset.value;
+      
+      if (isMatch) {
+        // Match found!
+        setTimeout(() => {
+          card1.classList.add('matched');
+          card2.classList.add('matched');
+          matchedPairs++;
+          flippedCards = [];
+          lockBoard = false;
+          
+          // Check win condition
+          if (matchedPairs === EMOJIS.length) {
+            endGame();
+          }
+        }, 300);
+      } else {
+        // No match - flip back
+        setTimeout(() => {
+          card1.classList.remove('flipped');
+          card2.classList.remove('flipped');
+          flippedCards = [];
+          lockBoard = false;
+        }, FLIP_DELAY);
+      }
+    }
+    
+    // ===== TIMER =====
+    function startTimer() {
+      startTime = Date.now();
+      timerInterval = setInterval(() => {
+        const elapsed = Math.floor((Date.now() - startTime) / 1000);
+        // Timer display could be added here if needed
+      }, 1000);
+    }
+    
+    function stopTimer() {
+      if (timerInterval) {
+        clearInterval(timerInterval);
+        timerInterval = null;
+      }
+      return Math.floor((Date.now() - startTime) / 1000);
+    }
+    
+    // ===== GAME FLOW =====
+    function startGame() {
+      // Reset state
+      matchedPairs = 0;
+      moves = 0;
+      flippedCards = [];
+      lockBoard = false;
+      gameActive = true;
+      
+      // Update UI
+      startScreen.classList.add('hidden');
+      gameOverScreen.classList.add('hidden');
+      
+      // Create and setup board
+      createCards();
+      startTimer();
+    }
+    
+    function endGame() {
+      gameActive = false;
+      const timeTaken = stopTimer();
+      
+      // Update best score
+      if (!bestScore || moves < bestScore) {
+        bestScore = moves;
+        localStorage.setItem('emojiMemoryBest', bestScore);
+      }
+      
+      // Update final screen
+      finalMovesEl.textContent = moves;
+      finalTimeEl.textContent = `${timeTaken}s`;
+      finalBestEl.textContent = bestScore;
+      
+      // Show win screen with confetti
+      gameOverScreen.classList.remove('hidden');
+      createConfetti();
+    }
+    
+    // ===== CONFETTI EFFECT =====
+    function createConfetti() {
+      const colors = ['#FFD700', '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FECA57'];
+      const container = document.querySelector('.game-container');
+      
+      for (let i = 0; i < 50; i++) {
+        setTimeout(() => {
+          const confetti = document.createElement('div');
+          confetti.className = 'confetti';
+          confetti.style.left = Math.random() * 100 + '%';
+          confetti.style.top = '-10px';
+          confetti.style.background = colors[Math.floor(Math.random() * colors.length)];
+          confetti.style.animationDuration = (2 + Math.random() * 2) + 's';
+          confetti.style.transform = `rotate(${Math.random() * 360}deg)`;
+          container.appendChild(confetti);
+          
+          // Remove after animation
+          setTimeout(() => confetti.remove(), 4000);
+        }, i * 50);
+      }
+    }
+    
+    // ===== EVENT LISTENERS =====
+    startBtn.addEventListener('click', startGame);
+    restartBtn.addEventListener('click', startGame);
+    
+    // Keyboard support
+    document.addEventListener('keydown', (e) => {
+      if (e.code === 'Space' || e.key === 'Enter') {
+        e.preventDefault();
+        if (!gameActive && !startScreen.classList.contains('hidden')) {
+          startGame();
+        } else if (!gameActive && !gameOverScreen.classList.contains('hidden')) {
+          startGame();
+        }
+      }
+    });
+    
+    // Prevent context menu on cards
+    gameBoard.addEventListener('contextmenu', (e) => e.preventDefault());
+    
+    // ===== INITIALIZE =====
+    // Pre-create cards for start screen preview (optional visual)
+    createCards();
+    // Hide all cards initially
+    cards.forEach(card => {
+      card.style.opacity = '0.5';
+      card.style.pointerEvents = 'none';
+    });
+  </script>
+</body>
+</html>

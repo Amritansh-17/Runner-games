@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Neon Hook ⚓</title>
+<style>
+/* --- Core Styling --- */
+* { margin: 0; padding: 0; box-sizing: border-box; touch-action: none; }
+html, body {
+    width: 100%; height: 100%;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    background: #050505;
+    display: flex; justify-content: center; align-items: center;
+    overflow: hidden;
+}
+
+#gameContainer {
+    position: relative;
+    width: min(96vw, 96vh * 2 / 3);
+    aspect-ratio: 2 / 3;
+    max-width: 450px;
+    background: #0a0a0a;
+    border-radius: 12px;
+    overflow: hidden;
+    border: 2px solid #333;
+}
+
+canvas { display: block; width: 100%; height: 100%; }
+
+.score-board {
+    position: absolute; top: 15px; left: 15px;
+    font-size: 24px; font-weight: 900; color: #00ff88;
+    text-shadow: 0 0 10px rgba(0,255,136,0.5); z-index: 10; pointer-events: none;
+}
+
+.high-score-board {
+    position: absolute; top: 45px; left: 15px;
+    font-size: 14px; font-weight: bold; color: #00d1ff;
+    opacity: 0.8; z-index: 10; pointer-events: none;
+}
+
+.screen {
+    position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0,0,0,0.85); backdrop-filter: blur(10px);
+    display: flex; flex-direction: column; justify-content: center; align-items: center;
+    z-index: 20; color: white; text-align: center; padding: 20px;
+}
+.screen.hidden { display: none; }
+
+.btn {
+    padding: 15px 40px; font-size: 18px; background: #00ff88;
+    color: #000; border: none; border-radius: 4px;
+    cursor: pointer; font-weight: bold; margin-top: 20px;
+    box-shadow: 0 4px 15px rgba(0,255,136,0.3);
+}
+
+.close-btn {
+    position: absolute; top: 15px; right: 15px;
+    width: 40px; height: 40px;
+    background: rgba(255,255,255,0.1); border-radius: 50%;
+    color: #ff4757; font-size: 27px; display: flex;
+    justify-content: center; align-items: center;
+    text-decoration: none; z-index: 30; pointer-events: auto;
+}
+</style>
+</head>
+<body>
+
+<div id="gameContainer">
+    <div class="score-board" id="score">0m</div>
+    <div class="high-score-board">BEST: <span id="bestScoreHUD">0</span>m</div>
+    <canvas id="gameCanvas"></canvas>
+    <a href="index.html" class="close-btn">&times;</a>
+
+    <div class="screen" id="startScreen">
+        <h1 style="color: #00ff88; font-size: 42px; letter-spacing: 2px;">NEON HOOK</h1>
+        <p style="color: #888; margin-top: 10px;">Hold to Grapple. Release to fly.</p>
+        <p style="color: #00d1ff; margin-top: 20px; font-weight: bold;">RECORD: <span id="startBest">0</span>m</p>
+        <button class="btn" onclick="startGame()">SWING</button>
+    </div>
+
+    <div class="screen hidden" id="gameOverScreen">
+        <h1 style="color: #ff4757; font-size: 38px;">FALLEN</h1>
+        <p id="finalScore" style="font-size: 20px; margin-top: 10px;"></p>
+        <p id="newRecordMsg" style="color: #00ff88; font-weight: bold; display: none; margin-top: 5px;">NEW RECORD!</p>
+        <button class="btn" onclick="startGame()">RETRY</button>
+    </div>
+</div>
+
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const scoreEl = document.getElementById('score');
+const bestHUD = document.getElementById('bestScoreHUD');
+const startBest = document.getElementById('startBest');
+
+let gameState = 'START';
+let score = 0;
+let highScore = localStorage.getItem('neonHookBest') || 0;
+let points = [];
+let player = { x: 100, y: 300, vx: 5, vy: 0, r: 10 };
+let hook = { active: false, x: 0, y: 0 };
+const gravity = 0.28;
+const friction = 0.985;
+
+// Initialize High Scores
+bestHUD.textContent = highScore;
+startBest.textContent = highScore;
+
+function resize() {
+    canvas.width = 400;
+    canvas.height = 600;
+}
+
+function startGame() {
+    score = 0;
+    player = { x: 100, y: 300, vx: 5, vy: 0, r: 10 };
+    hook.active = false;
+    points = [];
+    for(let i=0; i<5; i++) spawnPoint(i * 150 + 200);
+    
+    scoreEl.textContent = "0m";
+    gameState = 'PLAYING';
+    document.getElementById('startScreen').classList.add('hidden');
+    document.getElementById('gameOverScreen').classList.add('hidden');
+    document.getElementById('newRecordMsg').style.display = 'none';
+}
+
+function spawnPoint(x) {
+    points.push({ x: x, y: Math.random() * 250 + 50 });
+}
+
+function update() {
+    if (gameState !== 'PLAYING') return;
+
+    if (hook.active) {
+        let dx = hook.x - player.x;
+        let dy = hook.y - player.y;
+        let distance = Math.sqrt(dx*dx + dy*dy);
+        let pullStrength = 0.75;
+        
+        // Add tension towards the hook
+        player.vx += (dx / distance) * pullStrength;
+        player.vy += (dy / distance) * pullStrength;
+    } else {
+        player.vy += gravity;
+    }
+
+    player.vx *= friction;
+    player.vy *= friction;
+    player.x += player.vx;
+    player.y += player.vy;
+
+    // Scrolling logic
+    if (player.x > 150) {
+        let diff = player.x - 150;
+        player.x = 150;
+        score += diff;
+        scoreEl.textContent = Math.floor(score/10) + "m";
+        
+        points.forEach(p => p.x -= diff);
+        if (hook.active) hook.x -= diff;
+    }
+
+    if (points[points.length-1].x < 500) {
+        spawnPoint(points[points.length-1].x + 150 + Math.random() * 80);
+    }
+    if (points[0].x < -100) points.shift();
+
+    // Death Conditions
+    if (player.y > 620 || player.y < -20 || (player.vx < 0.05 && !hook.active)) {
+        endGame();
+    }
+}
+
+function draw() {
+    ctx.fillStyle = '#0a0a0a';
+    ctx.fillRect(0, 0, 400, 600);
+
+    // Draw Rope
+    if (hook.active) {
+        ctx.strokeStyle = '#00ff88';
+        ctx.lineWidth = 3;
+        ctx.setLineDash([5, 5]); // Dotted rope effect
+        ctx.beginPath();
+        ctx.moveTo(player.x, player.y);
+        ctx.lineTo(hook.x, hook.y);
+        ctx.stroke();
+        ctx.setLineDash([]);
+    }
+
+    // Draw Hook Points
+    points.forEach(p => {
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = '#222';
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 8, 0, Math.PI*2);
+        ctx.fill();
+        ctx.strokeStyle = '#00ff88';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        
+        // Center dot
+        ctx.fillStyle = '#00ff88';
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 2, 0, Math.PI*2);
+        ctx.fill();
+    });
+
+    // Draw Player
+    ctx.fillStyle = '#00ff88';
+    ctx.shadowBlur = 20; ctx.shadowColor = '#00ff88';
+    ctx.beginPath();
+    ctx.arc(player.x, player.y, player.r, 0, Math.PI*2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+}
+
+function handleAttach() {
+    if (gameState !== 'PLAYING') return;
+    let closest = null;
+    let minDist = 350;
+
+    points.forEach(p => {
+        let dx = p.x - player.x;
+        let dy = p.y - player.y;
+        let dist = Math.sqrt(dx*dx + dy*dy);
+        // Only hook to points in front or slightly above
+        if (dist < minDist && p.x > player.x - 30) {
+            minDist = dist;
+            closest = p;
+        }
+    });
+
+    if (closest) {
+        hook.active = true;
+        hook.x = closest.x;
+        hook.y = closest.y;
+    }
+}
+
+function handleDetach() {
+    hook.active = false;
+}
+
+function loop() {
+    update();
+    draw();
+    requestAnimationFrame(loop);
+}
+
+function endGame() {
+    if (gameState === 'GAME_OVER') return;
+    gameState = 'GAME_OVER';
+    let finalDist = Math.floor(score/10);
+    document.getElementById('finalScore').textContent = `Distance: ${finalDist}m`;
+    
+    if (finalDist > highScore) {
+        highScore = finalDist;
+        localStorage.setItem('neonHookBest', highScore);
+        bestHUD.textContent = highScore;
+        startBest.textContent = highScore;
+        document.getElementById('newRecordMsg').style.display = 'block';
+    }
+
+    document.getElementById('gameOverScreen').classList.remove('hidden');
+}
+
+canvas.addEventListener('mousedown', handleAttach);
+window.addEventListener('mouseup', handleDetach);
+canvas.addEventListener('touchstart', (e) => { e.preventDefault(); handleAttach(); }, {passive:false});
+window.addEventListener('touchend', handleDetach);
+
+resize();
+loop();
+</script>
+</body>
+</html>

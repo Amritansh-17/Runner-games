@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Turbo Dodger 🏎️</title>
+<style>
+/* --- Core Styling --- */
+* { margin: 0; padding: 0; box-sizing: border-box; touch-action: none; }
+html, body {
+    width: 100%; height: 100%;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    background: #0f0f0f;
+    display: flex; justify-content: center; align-items: center;
+    overflow: hidden; overscroll-behavior: none;
+    -webkit-tap-highlight-color: transparent;
+}
+
+#gameContainer {
+    position: relative;
+    width: min(96vw, 96vh * 2 / 3);
+    aspect-ratio: 2 / 3;
+    max-width: 540px;
+    background: #222;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.8);
+    border-radius: 20px;
+    overflow: hidden;
+    border: 3px solid #333;
+}
+
+canvas { display: block; width: 100%; height: 100%; }
+
+/* --- UI Layer --- */
+.ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; color: white; }
+
+.stats {
+    position: absolute; top: 20px; left: 20px;
+    display: flex; flex-direction: column; gap: 2px;
+    z-index: 10;
+}
+.score-box { font-size: 28px; font-weight: 900; color: #00d2ff; text-shadow: 0 0 10px rgba(0,210,255,0.5); }
+.best-box { font-size: 12px; font-weight: bold; color: #f368e0; text-transform: uppercase; letter-spacing: 1px; }
+.speed-box { font-size: 14px; font-weight: bold; color: #aaa; text-transform: uppercase; margin-top: 5px; }
+
+.screen {
+    position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0, 0, 0, 0.9); backdrop-filter: blur(15px);
+    display: flex; flex-direction: column; justify-content: center; align-items: center;
+    text-align: center; padding: 20px; z-index: 20; pointer-events: auto;
+}
+.screen.hidden { display: none; }
+
+h1 { font-size: clamp(36px, 12vw, 54px); margin-bottom: 10px; font-style: italic; color: #fff; line-height: 0.9; }
+.info { font-size: 16px; color: #888; margin-bottom: 30px; line-height: 1.5; }
+
+.btn {
+    padding: 18px 50px; font-size: 18px;
+    background: #fff; color: #000; border: none; border-radius: 4px;
+    cursor: pointer; font-weight: 900; text-transform: uppercase;
+    transition: 0.2s;
+}
+.btn:active { transform: scale(0.95); background: #00d2ff; }
+
+.close-btn {
+    position: absolute; top: 16px; right: 16px;
+    width: 42px; height: 42px;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 50%;
+    color: #ff4757; font-size: 27px; font-weight: bold;
+    display: flex; justify-content: center; align-items: center;
+    text-decoration: none; z-index: 30; pointer-events: auto;
+}
+
+#newRecord { color: #00ffcc; font-weight: bold; margin-bottom: 10px; display: none; }
+
+/* Screen Shake Animation */
+.shake { animation: shake 0.3s cubic-bezier(.36,.07,.19,.97) both; }
+@keyframes shake {
+    10%, 90% { transform: translate3d(-1px, 0, 0); }
+    20%, 80% { transform: translate3d(2px, 0, 0); }
+    30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
+    40%, 60% { transform: translate3d(4px, 0, 0); }
+}
+</style>
+</head>
+<body>
+
+<div id="gameContainer">
+    <canvas id="gameCanvas" width="400" height="600"></canvas>
+    
+    <div class="ui-layer">
+        <div class="stats">
+            <div class="score-box">SCORE: <span id="score">0</span></div>
+            <div class="best-box">BEST: <span id="bestScoreHUD">0</span></div>
+            <div class="speed-box">Speed: <span id="speedTxt">1.0</span>x</div>
+        </div>
+        
+        <a href="index.html" class="close-btn">&times;</a>
+
+        <div class="screen" id="startScreen">
+            <h1>TURBO<br>DODGER</h1>
+            <p class="info">Tap lanes to change.<br>Speed increases with every car dodged!</p>
+            <div style="margin-bottom: 20px;">
+                <p style="font-size: 12px; color: #555; text-transform: uppercase;">Current Record</p>
+                <p id="startBest" style="font-size: 24px; color: #f368e0; font-weight: 900;">0</p>
+            </div>
+            <button class="btn" id="startBtn">RACE NOW</button>
+        </div>
+
+        <div class="screen hidden" id="gameOverScreen">
+            <h1 style="color:#ff4757">WASTED</h1>
+            <p id="newRecord">NEW WORLD RECORD!</p>
+            <p class="info" id="finalScoreMsg"></p>
+            <button class="btn" id="restartBtn">RETRY</button>
+        </div>
+    </div>
+</div>
+
+<script>
+const canvas = document.getElementById('gameCanvas');
+const container = document.getElementById('gameContainer');
+const ctx = canvas.getContext('2d');
+const scoreEl = document.getElementById('score');
+const bestScoreHUD = document.getElementById('bestScoreHUD');
+const startBestEl = document.getElementById('startBest');
+const speedEl = document.getElementById('speedTxt');
+const startScreen = document.getElementById('startScreen');
+const gameOverScreen = document.getElementById('gameOverScreen');
+
+// Persistence
+let highScore = localStorage.getItem('turboDodgerBest') || 0;
+bestScoreHUD.textContent = highScore;
+startBestEl.textContent = highScore;
+
+// Game Parameters
+let gameState = 'START';
+let score = 0;
+let baseSpeed = 5;
+let currentSpeed = 5;
+let frame = 0;
+let enemies = [];
+const lanes = [66, 200, 334];
+let playerLane = 1;
+let playerVisualX = lanes[1];
+
+function drawCar(x, y, color, isPlayer = false) {
+    ctx.save();
+    ctx.translate(x, y);
+    
+    // Underglow
+    ctx.shadowBlur = isPlayer ? 20 : 10;
+    ctx.shadowColor = color;
+    
+    // Body
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.roundRect(-24, -45, 48, 90, 8);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+
+    // Interior/Glass
+    ctx.fillStyle = 'rgba(0,0,0,0.7)';
+    ctx.beginPath();
+    ctx.roundRect(-18, -22, 36, 40, 5);
+    ctx.fill();
+
+    // Spoiler for player
+    if(isPlayer) {
+        ctx.fillStyle = color;
+        ctx.fillRect(-26, 35, 52, 10);
+    }
+
+    // Headlights
+    ctx.fillStyle = '#fff';
+    ctx.shadowBlur = 10; ctx.shadowColor = '#fff';
+    ctx.fillRect(-20, -46, 10, 5);
+    ctx.fillRect(10, -46, 10, 5);
+    
+    // Tail lights
+    ctx.shadowBlur = 10; ctx.shadowColor = 'red';
+    ctx.fillStyle = '#ff0000';
+    ctx.fillRect(-18, 41, 8, 5);
+    ctx.fillRect(10, 41, 8, 5);
+    ctx.shadowBlur = 0;
+
+    // Wheels
+    ctx.fillStyle = '#111';
+    ctx.fillRect(-28, -35, 6, 18); ctx.fillRect(22, -35, 6, 18);
+    ctx.fillRect(-28, 20, 6, 18); ctx.fillRect(22, 20, 6, 18);
+
+    ctx.restore();
+}
+
+function drawRoad() {
+    ctx.fillStyle = '#1a1a1a';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    ctx.strokeStyle = '#333';
+    ctx.lineWidth = 4;
+    ctx.setLineDash([40, 60]);
+    ctx.lineDashOffset = -(frame * currentSpeed);
+    
+    ctx.beginPath();
+    ctx.moveTo(133, 0); ctx.lineTo(133, canvas.height);
+    ctx.moveTo(266, 0); ctx.lineTo(266, canvas.height);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Side markers
+    ctx.strokeStyle = '#444';
+    ctx.setLineDash([10, 20]);
+    ctx.beginPath();
+    ctx.moveTo(5, 0); ctx.lineTo(5, canvas.height);
+    ctx.moveTo(395, 0); ctx.lineTo(395, canvas.height);
+    ctx.stroke();
+}
+
+function update() {
+    if (gameState !== 'PLAYING') return;
+    
+    frame++;
+    currentSpeed = baseSpeed + (score * 0.15);
+    speedEl.textContent = (currentSpeed / 5).toFixed(1);
+    
+    let targetX = lanes[playerLane];
+    playerVisualX += (targetX - playerVisualX) * 0.25;
+
+    // Enemy Spawning
+    const spawnChance = Math.max(15, 50 - Math.floor(score / 1.5));
+    if (frame % spawnChance === 0) {
+        const laneIdx = Math.floor(Math.random() * 3);
+        const colors = ['#ff4757', '#2ed573', '#eccc68', '#ffa502', '#ffffff', '#a29bfe'];
+        enemies.push({
+            lane: laneIdx,
+            y: -150,
+            color: colors[Math.floor(Math.random() * colors.length)],
+            passed: false
+        });
+    }
+
+    for (let i = enemies.length - 1; i >= 0; i--) {
+        enemies[i].y += currentSpeed;
+
+        // Collision Check
+        const dx = Math.abs(lanes[enemies[i].lane] - playerVisualX);
+        const dy = Math.abs(enemies[i].y - 500);
+        if (dx < 42 && dy < 85) {
+            endGame();
+        }
+
+        // Scoring
+        if (!enemies[i].passed && enemies[i].y > 550) {
+            enemies[i].passed = true;
+            score++;
+            scoreEl.textContent = score;
+            if (score > highScore) {
+                bestScoreHUD.textContent = score;
+            }
+        }
+
+        if (enemies[i].y > canvas.height + 200) {
+            enemies.splice(i, 1);
+        }
+    }
+}
+
+function render() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    drawRoad();
+    
+    enemies.forEach(e => drawCar(lanes[e.lane], e.y, e.color));
+    drawCar(playerVisualX, 500, '#00d2ff', true);
+    
+    update();
+    requestAnimationFrame(render);
+}
+
+const handleInput = (clientX) => {
+    if (gameState !== 'PLAYING') return;
+    const rect = canvas.getBoundingClientRect();
+    const x = (clientX - rect.left) * (canvas.width / rect.width);
+    
+    if (x < 133) playerLane = 0;
+    else if (x < 266) playerLane = 1;
+    else playerLane = 2;
+};
+
+window.addEventListener('keydown', e => {
+    if (gameState !== 'PLAYING') return;
+    if ((e.key === 'ArrowLeft' || e.key === 'a') && playerLane > 0) playerLane--;
+    if ((e.key === 'ArrowRight' || e.key === 'd') && playerLane < 2) playerLane++;
+});
+
+canvas.addEventListener('mousedown', e => handleInput(e.clientX));
+canvas.addEventListener('touchstart', e => {
+    e.preventDefault();
+    handleInput(e.touches[0].clientX);
+}, {passive: false});
+
+function startGame() {
+    score = 0; currentSpeed = baseSpeed; enemies = []; playerLane = 1;
+    playerVisualX = lanes[1];
+    scoreEl.textContent = "0";
+    bestScoreHUD.textContent = highScore;
+    gameState = 'PLAYING';
+    startScreen.classList.add('hidden');
+    gameOverScreen.classList.add('hidden');
+    container.classList.remove('shake');
+}
+
+function endGame() {
+    if (gameState === 'GAME_OVER') return;
+    gameState = 'GAME_OVER';
+    
+    container.classList.add('shake');
+    
+    let isNewRecord = false;
+    if (score > highScore) {
+        highScore = score;
+        localStorage.setItem('turboDodgerBest', highScore);
+        startBestEl.textContent = highScore;
+        isNewRecord = true;
+    }
+
+    document.getElementById('newRecord').style.display = isNewRecord ? 'block' : 'none';
+    document.getElementById('finalScoreMsg').innerHTML = `Dodged <b>${score}</b> cars<br>at <b>${speedEl.textContent}x</b> intensity!`;
+    gameOverScreen.classList.remove('hidden');
+}
+
+document.getElementById('startBtn').addEventListener('click', startGame);
+document.getElementById('restartBtn').addEventListener('click', startGame);
+
+render();
+</script>
+</body>
+</html>

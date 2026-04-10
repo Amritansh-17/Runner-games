@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Catch the Ball 🏀</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; touch-action: none; }
+html, body {
+  width: 100%; height: 100%;
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%);
+  display: flex; justify-content: center; align-items: center;
+  overflow: hidden; overscroll-behavior: none;
+  -webkit-tap-highlight-color: transparent;
+}
+#gameContainer {
+  position: relative;
+  width: min(96vw, 96vh * 2 / 3);
+  aspect-ratio: 2 / 3;
+  max-width: 540px;
+  background: linear-gradient(to bottom, #87CEEB, #E0F7FA);
+  box-shadow: 0 20px 60px rgba(0,0,0,0.35);
+  border-radius: 16px;
+  overflow: hidden;
+  touch-action: none;
+}
+canvas { display: block; width: 100%; height: 100%; }
+.ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
+
+.score-board {
+  position: absolute; top: clamp(8px, 2.5vw, 18px); left: clamp(8px, 2.5vw, 18px);
+  color: white; font-size: clamp(18px, 5vw, 26px); font-weight: bold;
+  text-shadow: 2px 2px 4px rgba(0,0,0,0.3); z-index: 10;
+}
+.misses {
+  position: absolute; top: clamp(40px, 8vw, 62px); left: clamp(8px, 2.5vw, 18px);
+  color: #ff4757; font-size: clamp(14px, 4vw, 20px); font-weight: bold;
+  text-shadow: 1px 1px 2px rgba(0,0,0,0.2); z-index: 10;
+}
+.screen {
+  position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+  background: rgba(0, 0, 0, 0.65); backdrop-filter: blur(6px);
+  display: flex; flex-direction: column; justify-content: center; align-items: center;
+  text-align: center; padding: clamp(10px, 3vw, 20px);
+  z-index: 20; pointer-events: auto; transition: opacity 0.3s;
+}
+.screen.hidden { display: none; }
+h1 { font-size: clamp(24px, 7vw, 36px); color: white; margin-bottom: clamp(8px, 2vw, 16px); text-shadow: 3px 3px 6px rgba(0,0,0,0.4); }
+.info { color: white; font-size: clamp(12px, 3.5vw, 17px); margin: 6px 0; line-height: 1.5; opacity: 0.95; max-width: 90%; }
+.high-score { color: #FFD700; font-size: clamp(16px, 4.5vw, 22px); margin: 12px 0; font-weight: bold; text-shadow: 1px 1px 3px rgba(0,0,0,0.5); }
+.btn {
+  padding: clamp(10px, 2.5vw, 14px) clamp(24px, 6vw, 40px);
+  font-size: clamp(14px, 4vw, 20px);
+  background: linear-gradient(135deg, #FFD700, #FFA500);
+  color: #1a1a1a; border: none; border-radius: 50px; cursor: pointer; font-weight: bold;
+  margin-top: clamp(12px, 3vw, 20px);
+  box-shadow: 0 5px 15px rgba(0,0,0,0.25); transition: all 0.2s;
+  min-width: 140px;
+}
+.btn:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(0,0,0,0.3); filter: brightness(1.05); }
+.btn:active { transform: translateY(2px); box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
+
+/* ✅ CLOSE BUTTON (27px, Red, Perfectly Centered) */
+.close-btn {
+  position: absolute;
+  top: clamp(8px, 2vw, 16px);
+  right: clamp(8px, 2vw, 16px);
+  width: clamp(32px, 8vw, 42px);
+  height: clamp(32px, 8vw, 42px);
+  background: rgba(255, 255, 255, 0.2);
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  border-radius: 50%;
+  color: #ff4757;
+  font-size: clamp(20px, 6vw, 27px);
+  font-weight: bold;
+  display: flex; justify-content: center; align-items: center;
+  text-decoration: none; cursor: pointer; transition: all 0.2s;
+  z-index: 30; font-family: system-ui, sans-serif; user-select: none;
+  backdrop-filter: blur(4px);
+}
+.close-btn:hover { background: rgba(255, 255, 255, 0.35); transform: scale(1.1); }
+.close-btn:active { transform: scale(0.95); }
+</style>
+</head>
+<body>
+<div id="gameContainer">
+  <canvas id="gameCanvas" width="480" height="720"></canvas>
+  <div class="ui-layer">
+    <div class="score-board">Score: <span id="score">0</span></div>
+    <div class="misses">Lives: <span id="lives">❤️❤️❤️</span></div>
+    
+    <!-- Start Screen -->
+    <div class="screen" id="startScreen">
+      <a href="index.html" class="close-btn" title="Back to Home">&times;</a>
+      <h1>🏀 Catch the Ball</h1>
+      <div class="high-score">High Score: <span id="startHighScore">0</span></div>
+      <p class="info">Move the basket to catch falling balls.<br>Miss 3 balls and it's Game Over!<br>Gold balls give +2 points!</p>
+      <button class="btn" id="startBtn">START GAME</button>
+    </div>
+
+    <!-- Game Over Screen -->
+    <div class="screen hidden" id="gameOverScreen">
+      <a href="index.html" class="close-btn" title="Back to Home">&times;</a>
+      <h1>Game Over!</h1>
+      <div class="info">Final Score: <span id="finalScore">0</span></div>
+      <div class="high-score">Best: <span id="goHighScore">0</span></div>
+      <button class="btn" id="restartBtn">PLAY AGAIN</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+// UI Elements
+const startScreen = document.getElementById('startScreen');
+const gameOverScreen = document.getElementById('gameOverScreen');
+const scoreEl = document.getElementById('score');
+const livesEl = document.getElementById('lives');
+const finalScoreEl = document.getElementById('finalScore');
+const startHighScoreEl = document.getElementById('startHighScore');
+const goHighScoreEl = document.getElementById('goHighScore');
+const startBtn = document.getElementById('startBtn');
+const restartBtn = document.getElementById('restartBtn');
+
+// Game State
+let gameState = 'START';
+let score = 0;
+let lives = 3;
+let highScore = parseInt(localStorage.getItem('catchBallHighScore')) || 0;
+let frame = 0;
+let balls = [];
+let particles = [];
+let spawnRate = 65;
+let ballSpeed = 3.5;
+
+// Basket
+const basket = { x: canvas.width / 2, y: canvas.height - 60, w: 90, h: 22, targetX: canvas.width / 2 };
+
+// 🔹 RESPONSIVE INPUT MAPPING
+function getCanvasPos(clientX, clientY) {
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = canvas.width / rect.width;
+  const scaleY = canvas.height / rect.height;
+  return {
+    x: (clientX - rect.left) * scaleX,
+    y: (clientY - rect.top) * scaleY
+  };
+}
+
+// Mouse
+canvas.addEventListener('mousemove', e => {
+  const pos = getCanvasPos(e.clientX, e.clientY);
+  basket.targetX = pos.x;
+});
+
+// Touch
+canvas.addEventListener('touchmove', e => {
+  e.preventDefault();
+  const pos = getCanvasPos(e.touches[0].clientX, e.touches[0].clientY);
+  basket.targetX = pos.x;
+}, { passive: false });
+
+canvas.addEventListener('touchstart', e => {
+  e.preventDefault();
+  const pos = getCanvasPos(e.touches[0].clientX, e.touches[0].clientY);
+  basket.targetX = pos.x;
+}, { passive: false });
+
+// Keyboard
+const keys = {};
+document.addEventListener('keydown', e => keys[e.key] = true);
+document.addEventListener('keyup', e => keys[e.key] = false);
+
+function updatePhysics() {
+  if (gameState !== 'PLAYING') return;
+  
+  if (keys['ArrowLeft'] || keys['a']) basket.targetX -= 10;
+  if (keys['ArrowRight'] || keys['d']) basket.targetX += 10;
+  
+  // Smooth lerp
+  basket.x += (basket.targetX - basket.x) * 0.15;
+  // Clamp
+  basket.x = Math.max(basket.w/2 + 10, Math.min(canvas.width - basket.w/2 - 10, basket.x));
+}
+
+// Ball Spawning
+function spawnBall() {
+  const isGold = Math.random() < 0.15;
+  balls.push({
+    x: 25 + Math.random() * (canvas.width - 50),
+    y: -30,
+    radius: isGold ? 16 : 14,
+    speed: ballSpeed * (0.85 + Math.random() * 0.3),
+    color: isGold ? '#FFD700' : `hsl(${Math.random()*360}, 70%, 60%)`,
+    isGold, rotation: 0
+  });
+}
+
+// Particles
+function createParticles(x, y, color) {
+  for(let i=0; i<10; i++) {
+    particles.push({
+      x, y, vx: (Math.random()-0.5)*7, vy: (Math.random()-0.5)*7 - 2,
+      life: 25 + Math.random()*15, color, size: 3 + Math.random()*4
+    });
+  }
+}
+
+// Update & Logic
+function update() {
+  if (gameState !== 'PLAYING') return;
+  updatePhysics();
+  frame++;
+
+  // Progressive Difficulty (gets harder with time)
+  if (frame % 600 === 0) { // Every ~10 seconds
+    ballSpeed += 0.15;
+    spawnRate = Math.max(25, spawnRate - 3);
+  }
+
+  if (frame % Math.floor(spawnRate) === 0) spawnBall();
+
+  for (let i = balls.length - 1; i >= 0; i--) {
+    let b = balls[i];
+    b.y += b.speed;
+    b.rotation += 0.04;
+
+    // Catch Detection
+    const inX = b.x >= basket.x - basket.w/2 - 12 && b.x <= basket.x + basket.w/2 + 12;
+    const inY = b.y + b.radius >= basket.y && b.y - b.radius <= basket.y + basket.h;
+    if (inX && inY) {
+      score += b.isGold ? 2 : 1;
+      scoreEl.textContent = score;
+      createParticles(b.x, b.y, b.color);
+      balls.splice(i, 1);
+      continue;
+    }
+
+    // Missed
+    if (b.y - b.radius > canvas.height) {
+      lives--;
+      livesEl.textContent = '❤️'.repeat(Math.max(0, lives));
+      createParticles(b.x, canvas.height - 10, '#ff4757');
+      balls.splice(i, 1);
+      if (lives <= 0) endGame();
+    }
+  }
+
+  // Update Particles
+  for (let i = particles.length - 1; i >= 0; i--) {
+    let p = particles[i];
+    p.x += p.vx; p.y += p.vy; p.vy += 0.2; p.life--;
+    if (p.life <= 0) particles.splice(i, 1);
+  }
+}
+
+// Drawing
+function draw() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  
+  // Draw Basket
+  ctx.fillStyle = '#8B4513';
+  ctx.beginPath();
+  ctx.moveTo(basket.x - basket.w/2, basket.y);
+  ctx.lineTo(basket.x + basket.w/2, basket.y);
+  ctx.lineTo(basket.x + basket.w/2 + 12, basket.y + basket.h);
+  ctx.lineTo(basket.x - basket.w/2 - 12, basket.y + basket.h);
+  ctx.closePath(); ctx.fill();
+  ctx.strokeStyle = '#5D2906'; ctx.lineWidth = 3; ctx.stroke();
+  ctx.fillStyle = '#A0522D'; ctx.fillRect(basket.x - basket.w/2 + 4, basket.y + 2, basket.w - 8, 6);
+
+  // Draw Balls
+  balls.forEach(b => {
+    ctx.save(); ctx.translate(b.x, b.y); ctx.rotate(b.rotation);
+    ctx.fillStyle = b.color;
+    ctx.beginPath(); ctx.arc(0, 0, b.radius, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.4)';
+    ctx.beginPath(); ctx.arc(-4, -4, b.radius * 0.3, 0, Math.PI * 2); ctx.fill();
+    if(b.isGold) {
+      ctx.fillStyle = '#FFF'; ctx.font = `${b.radius}px sans-serif`;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('★', 0, 1);
+    }
+    ctx.restore();
+  });
+
+  // Draw Particles
+  particles.forEach(p => {
+    ctx.globalAlpha = Math.max(0, p.life / 40);
+    ctx.fillStyle = p.color;
+    ctx.beginPath(); ctx.arc(p.x, p.y, p.size * (p.life/40), 0, Math.PI * 2); ctx.fill();
+  });
+  ctx.globalAlpha = 1;
+}
+
+function loop() { update(); draw(); requestAnimationFrame(loop); }
+
+function startGame() {
+  gameState = 'PLAYING';
+  score = 0; lives = 3; frame = 0; ballSpeed = 3.5; spawnRate = 65;
+  balls = []; particles = [];
+  scoreEl.textContent = '0'; livesEl.textContent = '❤️❤️❤️';
+  startScreen.classList.add('hidden'); gameOverScreen.classList.add('hidden');
+  basket.targetX = canvas.width / 2; basket.x = canvas.width / 2;
+}
+
+function endGame() {
+  gameState = 'GAME_OVER';
+  if (score > highScore) { highScore = score; localStorage.setItem('catchBallHighScore', highScore); }
+  finalScoreEl.textContent = score; goHighScoreEl.textContent = highScore; startHighScoreEl.textContent = highScore;
+  gameOverScreen.classList.remove('hidden');
+}
+
+// Init
+startHighScoreEl.textContent = highScore;
+startBtn.addEventListener('click', startGame);
+restartBtn.addEventListener('click', startGame);
+loop();
+</script>
+</body>
+</html>

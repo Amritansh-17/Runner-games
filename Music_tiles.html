@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Neon Beats 🎵</title>
+<style>
+/* --- Core Styling --- */
+* { margin: 0; padding: 0; box-sizing: border-box; touch-action: none; }
+html, body {
+    width: 100%; height: 100%;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    background: #000;
+    display: flex; justify-content: center; align-items: center;
+    overflow: hidden;
+}
+
+#gameContainer {
+    position: relative;
+    width: min(96vw, 96vh * 2 / 3);
+    aspect-ratio: 2 / 3;
+    max-width: 400px;
+    background: #050505;
+    border-radius: 12px;
+    overflow: hidden;
+    border: 2px solid #1a1a1a;
+}
+
+canvas { display: block; width: 100%; height: 100%; }
+
+/* --- UI --- */
+.ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
+
+.score-board {
+    position: absolute; top: 20px; width: 100%; text-align: center;
+    color: #fff; font-size: 32px; font-weight: 900;
+    text-shadow: 0 0 10px rgba(0,255,255,0.5);
+}
+
+.high-score-tag {
+    position: absolute; top: 60px; width: 100%; text-align: center;
+    color: #00f2fe; font-size: 14px; font-weight: bold; opacity: 0.8;
+}
+
+.screen {
+    position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0,0,0,0.85); backdrop-filter: blur(10px);
+    display: flex; flex-direction: column; justify-content: center; align-items: center;
+    z-index: 20; color: white; text-align: center; padding: 20px; pointer-events: auto;
+}
+.screen.hidden { display: none; }
+
+.btn {
+    padding: 15px 40px; font-size: 18px; background: transparent;
+    color: #00f2fe; border: 2px solid #00f2fe; border-radius: 4px;
+    cursor: pointer; font-weight: bold; margin-top: 20px; text-transform: uppercase;
+    transition: all 0.2s;
+}
+.btn:hover { background: #00f2fe; color: #000; }
+
+.close-btn {
+    position: absolute; top: 15px; right: 15px;
+    width: 35px; height: 35px;
+    background: rgba(255,255,255,0.1); border-radius: 50%;
+    color: #ff4757; font-size: 24px; display: flex;
+    justify-content: center; align-items: center;
+    text-decoration: none; z-index: 30; pointer-events: auto;
+    border: 1px solid rgba(255,71,87,0.3);
+}
+
+.key-hints {
+    position: absolute; bottom: 5px; width: 100%;
+    display: flex; justify-content: space-around;
+    color: #444; font-size: 12px; font-weight: bold;
+}
+</style>
+</head>
+<body>
+
+<div id="gameContainer">
+    <div class="ui-layer">
+        <div class="score-board" id="score">0</div>
+        <div class="high-score-tag">BEST: <span id="bestScore">0</span></div>
+        <a href="index.html" class="close-btn">&times;</a>
+
+        <div class="screen" id="startScreen">
+            <h1 style="color: #00f2fe; letter-spacing: 4px; font-size: 40px;">NEON BEATS</h1>
+            <p style="color: #888; margin-top: 10px; line-height: 1.6;">Tap the tiles in the hit zone.<br>Use <b>S D J K</b> keys or Touch.</p>
+            <div style="margin-top: 20px; padding: 10px; border-top: 1px solid #222;">
+                <p style="font-size: 12px; color: #555;">TOP BEAT</p>
+                <p id="startBest" style="font-size: 24px; color: #fff;">0</p>
+            </div>
+            <button class="btn" onclick="startGame()">START TRACK</button>
+        </div>
+
+        <div class="screen hidden" id="gameOverScreen">
+            <h1 style="color: #ff4757; font-size: 32px;">MISSED BEAT</h1>
+            <p id="finalScore" style="font-size: 20px; margin: 10px 0;"></p>
+            <p id="newRecordMsg" style="color: #00f2fe; font-weight: bold; margin-bottom: 10px; display: none;">NEW BEST RECORD!</p>
+            <button class="btn" onclick="startGame()">RETRY</button>
+        </div>
+
+        <div class="key-hints">
+            <span>S</span><span>D</span><span>J</span><span>K</span>
+        </div>
+    </div>
+    <canvas id="gameCanvas"></canvas>
+</div>
+
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const scoreEl = document.getElementById('score');
+const bestScoreEl = document.getElementById('bestScore');
+const startBestEl = document.getElementById('startBest');
+
+let gameState = 'START';
+let score = 0;
+let highScore = localStorage.getItem('neonBeatsBest') || 0;
+let speed = 5;
+let tiles = [];
+let frame = 0;
+
+// Update UI on load
+bestScoreEl.textContent = highScore;
+startBestEl.textContent = highScore;
+
+const laneWidth = 100;
+const hitLineY = 500; 
+const hitZoneHeight = 80;
+
+function resize() {
+    canvas.width = 400;
+    canvas.height = 600;
+}
+
+function startGame() {
+    score = 0;
+    speed = 5;
+    tiles = [];
+    frame = 0;
+    scoreEl.textContent = "0";
+    gameState = 'PLAYING';
+    document.getElementById('startScreen').classList.add('hidden');
+    document.getElementById('gameOverScreen').classList.add('hidden');
+    document.getElementById('newRecordMsg').style.display = 'none';
+}
+
+function spawnTile() {
+    // Spawns faster as score increases
+    const spawnRate = Math.max(12, 30 - Math.floor(score/8));
+    if (frame % spawnRate === 0) {
+        const lane = Math.floor(Math.random() * 4);
+        tiles.push({
+            lane: lane,
+            y: -150,
+            h: 110,
+            hit: false,
+            color: `hsl(${180 + (lane * 30)}, 100%, 60%)`
+        });
+    }
+}
+
+function update() {
+    if (gameState !== 'PLAYING') return;
+    frame++;
+    speed = 5.5 + (score / 20);
+
+    tiles.forEach((tile) => {
+        tile.y += speed;
+        // If the bottom of the tile passes the bottom of the hit zone without being hit
+        if (tile.y > (hitLineY + hitZoneHeight) && !tile.hit) {
+            endGame();
+        }
+    });
+
+    tiles = tiles.filter(t => t.y < canvas.height + 100);
+    spawnTile();
+}
+
+function draw() {
+    ctx.fillStyle = '#050505';
+    ctx.fillRect(0, 0, 400, 600);
+
+    // Draw Lanes
+    ctx.strokeStyle = '#111';
+    ctx.lineWidth = 2;
+    for(let i=1; i<4; i++) {
+        ctx.beginPath();
+        ctx.moveTo(i * 100, 0);
+        ctx.lineTo(i * 100, 600);
+        ctx.stroke();
+    }
+
+    // Hit Zone Visual
+    ctx.fillStyle = 'rgba(0, 242, 254, 0.05)';
+    ctx.fillRect(0, hitLineY, 400, hitZoneHeight);
+    ctx.strokeStyle = '#222';
+    ctx.strokeRect(0, hitLineY, 400, hitZoneHeight);
+
+    // Draw Tiles
+    tiles.forEach(tile => {
+        if (!tile.hit) {
+            // Neon Glow
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = tile.color;
+            ctx.fillStyle = tile.color;
+            // Draw tile with slightly rounded edges
+            ctx.fillRect(tile.lane * 100 + 5, tile.y, 90, tile.h);
+            ctx.shadowBlur = 0;
+        }
+    });
+}
+
+function handleInput(lane) {
+    if (gameState !== 'PLAYING') return;
+
+    // Check for tile within the hit zone (with a generous buffer)
+    const targetTile = tiles.find(t => 
+        t.lane === lane && 
+        !t.hit && 
+        t.y + t.h > hitLineY - 20 && 
+        t.y < hitLineY + hitZoneHeight + 20
+    );
+
+    if (targetTile) {
+        targetTile.hit = true;
+        score++;
+        scoreEl.textContent = score;
+        
+        // Dynamic speed feedback
+        if (score > highScore) {
+            bestScoreEl.textContent = score;
+        }
+    }
+}
+
+function endGame() {
+    if (gameState === 'GAME_OVER') return;
+    gameState = 'GAME_OVER';
+    
+    document.getElementById('finalScore').textContent = `Total Hits: ${score}`;
+    
+    if (score > highScore) {
+        highScore = score;
+        localStorage.setItem('neonBeatsBest', highScore);
+        startBestEl.textContent = highScore;
+        bestScoreEl.textContent = highScore;
+        document.getElementById('newRecordMsg').style.display = 'block';
+    }
+    
+    document.getElementById('gameOverScreen').classList.remove('hidden');
+}
+
+function loop() {
+    update();
+    draw();
+    requestAnimationFrame(loop);
+}
+
+// Controls
+window.addEventListener('keydown', e => {
+    const keyMap = { 'KeyS': 0, 'KeyD': 1, 'KeyJ': 2, 'KeyK': 3 };
+    if (keyMap[e.code] !== undefined) handleInput(keyMap[e.code]);
+});
+
+canvas.addEventListener('mousedown', e => {
+    const rect = canvas.getBoundingClientRect();
+    const x = (e.clientX - rect.left) * (400 / rect.width);
+    handleInput(Math.floor(x / 100));
+});
+
+canvas.addEventListener('touchstart', e => {
+    e.preventDefault();
+    const rect = canvas.getBoundingClientRect();
+    const x = (e.touches[0].clientX - rect.left) * (400 / rect.width);
+    handleInput(Math.floor(x / 100));
+}, {passive: false});
+
+resize();
+loop();
+</script>
+</body>
+</html>

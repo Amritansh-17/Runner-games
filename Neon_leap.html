@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Neon Leap 🚀</title>
+<style>
+/* --- Core Styling --- */
+* { margin: 0; padding: 0; box-sizing: border-box; touch-action: none; }
+html, body {
+    width: 100%; height: 100%;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    background: #080808;
+    display: flex; justify-content: center; align-items: center;
+    overflow: hidden;
+}
+
+#gameContainer {
+    position: relative;
+    width: min(96vw, 96vh * 2 / 3);
+    aspect-ratio: 2 / 3;
+    max-width: 450px;
+    background: #0a0a0a;
+    border-radius: 12px;
+    overflow: hidden;
+    border: 2px solid #222;
+}
+
+canvas { display: block; width: 100%; height: 100%; }
+
+/* --- UI --- */
+.score-board {
+    position: absolute; top: 15px; left: 15px;
+    font-size: 24px; font-weight: 900; color: #ff00ff;
+    text-shadow: 0 0 10px #ff00ff; z-index: 10; pointer-events: none;
+}
+
+.high-score-board {
+    position: absolute; top: 45px; left: 15px;
+    font-size: 14px; font-weight: bold; color: #00f2fe;
+    opacity: 0.8; z-index: 10; pointer-events: none;
+}
+
+.screen {
+    position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0,0,0,0.85); backdrop-filter: blur(10px);
+    display: flex; flex-direction: column; justify-content: center; align-items: center;
+    z-index: 20; color: white; text-align: center; padding: 20px;
+}
+.screen.hidden { display: none; }
+
+.btn {
+    padding: 15px 40px; font-size: 18px; background: #ff00ff;
+    color: #fff; border: none; border-radius: 4px;
+    cursor: pointer; font-weight: bold; margin-top: 20px;
+    box-shadow: 0 0 15px rgba(255, 0, 255, 0.4);
+}
+
+.close-btn {
+    position: absolute; top: 15px; right: 15px;
+    width: 40px; height: 40px;
+    background: rgba(255,255,255,0.1); border-radius: 50%;
+    color: #ff4757; font-size: 27px; display: flex;
+    justify-content: center; align-items: center;
+    text-decoration: none; z-index: 30; pointer-events: auto;
+}
+</style>
+</head>
+<body>
+
+<div id="gameContainer">
+    <div class="score-board" id="score">0</div>
+    <div class="high-score-board">BEST: <span id="bestScoreHUD">0</span></div>
+    <canvas id="gameCanvas"></canvas>
+    <a href="index.html" class="close-btn">&times;</a>
+
+    <div class="screen" id="startScreen">
+        <h1 style="color: #ff00ff; letter-spacing: 3px; font-size: 40px;">NEON LEAP</h1>
+        <p style="color: #888; margin-top: 10px;">Tilt or Tap to move side-to-side.<br>Climb as high as you can!</p>
+        <p style="color: #00f2fe; margin-top: 15px; font-weight: bold;">RECORD: <span id="startBest">0</span></p>
+        <button class="btn" onclick="startGame()">LIFT OFF</button>
+    </div>
+
+    <div class="screen hidden" id="gameOverScreen">
+        <h1 style="color: #ff4757; font-size: 36px;">FALLEN</h1>
+        <p id="finalScore" style="font-size: 20px; margin-top: 10px;"></p>
+        <p id="newRecordMsg" style="color: #00f2fe; font-weight: bold; display: none; margin-top: 5px;">NEW HIGH SCORE!</p>
+        <button class="btn" onclick="startGame()">RETRY</button>
+    </div>
+</div>
+
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const scoreEl = document.getElementById('score');
+const bestHUD = document.getElementById('bestScoreHUD');
+const startBestEl = document.getElementById('startBest');
+
+let gameState = 'START';
+let score = 0;
+let highScore = localStorage.getItem('neonLeapBest') || 0;
+let platforms = [];
+let trail = [];
+
+let player = {
+    x: 200, y: 400, w: 25, h: 25,
+    vx: 0, vy: 0,
+    jumpStrength: -11
+};
+
+const gravity = 0.35;
+const platW = 75;
+const platH = 12;
+
+// Init score displays
+bestHUD.textContent = highScore;
+startBestEl.textContent = highScore;
+
+function resize() {
+    canvas.width = 400;
+    canvas.height = 600;
+}
+
+function startGame() {
+    score = 0;
+    scoreEl.textContent = "0";
+    player.x = 200;
+    player.y = 400;
+    player.vx = 0;
+    player.vy = 0;
+    platforms = [];
+    trail = [];
+    
+    // Starting platform directly under player
+    platforms.push({ x: 160, y: 500 });
+    
+    // Generate initial set
+    for(let i=1; i<8; i++) {
+        spawnPlatform(600 - (i * 90));
+    }
+    
+    gameState = 'PLAYING';
+    document.getElementById('startScreen').classList.add('hidden');
+    document.getElementById('gameOverScreen').classList.add('hidden');
+    document.getElementById('newRecordMsg').style.display = 'none';
+}
+
+function spawnPlatform(y) {
+    platforms.push({
+        x: Math.random() * (400 - platW),
+        y: y
+    });
+}
+
+function update() {
+    if (gameState !== 'PLAYING') return;
+
+    player.vy += gravity;
+    player.y += player.vy;
+    player.x += player.vx;
+
+    // Movement Trail
+    trail.push({x: player.x, y: player.y, opacity: 0.5});
+    if (trail.length > 10) trail.shift();
+
+    // Screen wrapping
+    if (player.x > 400) player.x = -player.w;
+    if (player.x < -player.w) player.x = 400;
+
+    // Platform collision (only when falling)
+    if (player.vy > 0) {
+        platforms.forEach(p => {
+            if (player.x + player.w > p.x && 
+                player.x < p.x + platW &&
+                player.y + player.h > p.y && 
+                player.y + player.h < p.y + platH + player.vy) {
+                player.vy = player.jumpStrength;
+                player.y = p.y - player.h; // Snap to top
+            }
+        });
+    }
+
+    // Camera move & Platform recycling
+    if (player.y < 300) {
+        let diff = 300 - player.y;
+        player.y = 300;
+        score += Math.floor(diff);
+        scoreEl.textContent = Math.floor(score / 10);
+        
+        platforms.forEach(p => {
+            p.y += diff;
+            if (p.y > 600) {
+                p.y = -20;
+                p.x = Math.random() * (400 - platW);
+            }
+        });
+        
+        trail.forEach(t => t.y += diff);
+    }
+
+    // Game Over
+    if (player.y > 650) endGame();
+}
+
+function draw() {
+    ctx.fillStyle = '#0a0a0a';
+    ctx.fillRect(0, 0, 400, 600);
+
+    // Draw Trail
+    trail.forEach((t, i) => {
+        ctx.fillStyle = `rgba(255, 0, 255, ${i/20})`;
+        ctx.fillRect(t.x, t.y, player.w, player.h);
+    });
+
+    // Draw Platforms
+    ctx.shadowBlur = 15; ctx.shadowColor = "#00f2fe";
+    ctx.fillStyle = "#00f2fe";
+    platforms.forEach(p => {
+        ctx.fillRect(p.x, p.y, platW, platH);
+    });
+
+    // Draw Player
+    ctx.shadowBlur = 15; ctx.shadowColor = "#ff00ff";
+    ctx.fillStyle = "#ff00ff";
+    ctx.fillRect(player.x, player.y, player.w, player.h);
+    ctx.shadowBlur = 0;
+}
+
+function loop() {
+    update();
+    draw();
+    requestAnimationFrame(loop);
+}
+
+function endGame() {
+    if (gameState === 'GAME_OVER') return;
+    gameState = 'GAME_OVER';
+    let finalVal = Math.floor(score/10);
+    document.getElementById('finalScore').textContent = `Height: ${finalVal}`;
+    
+    if (finalVal > highScore) {
+        highScore = finalVal;
+        localStorage.setItem('neonLeapBest', highScore);
+        bestHUD.textContent = highScore;
+        startBestEl.textContent = highScore;
+        document.getElementById('newRecordMsg').style.display = 'block';
+    }
+    
+    document.getElementById('gameOverScreen').classList.remove('hidden');
+}
+
+/* --- Controls --- */
+window.addEventListener('keydown', e => {
+    if (e.key === 'ArrowLeft' || e.key === 'a') player.vx = -6;
+    if (e.key === 'ArrowRight' || e.key === 'd') player.vx = 6;
+});
+window.addEventListener('keyup', e => {
+    if (['ArrowLeft', 'ArrowRight', 'a', 'd'].includes(e.key)) player.vx = 0;
+});
+
+// Touch controls
+canvas.addEventListener('touchstart', e => {
+    const x = e.touches[0].clientX;
+    if (x < window.innerWidth / 2) player.vx = -6;
+    else player.vx = 6;
+});
+canvas.addEventListener('touchend', () => player.vx = 0);
+
+resize();
+loop();
+</script>
+</body>
+</html>

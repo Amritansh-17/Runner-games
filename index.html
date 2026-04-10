@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Endless Runs 🎮 | Ultimate Collection</title>
+  <style>
+    :root {
+      --bg-dark: #07090f;
+      --accent-purple: #8b5cf6;
+      --accent-pink: #ec4899;
+      --accent-cyan: #06b6d4;
+      --text-main: #f8fafc;
+      --card-bg: rgba(255, 255, 255, 0.03);
+      --card-border: rgba(255, 255, 255, 0.08);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      background-color: var(--bg-dark);
+      background-image: 
+        radial-gradient(at 0% 0%, rgba(139, 92, 246, 0.1) 0px, transparent 50%),
+        radial-gradient(at 100% 0%, rgba(6, 182, 212, 0.1) 0px, transparent 50%),
+        radial-gradient(at 50% 100%, rgba(236, 72, 153, 0.1) 0px, transparent 50%);
+      color: var(--text-main);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+    }
+
+    header {
+      text-align: center;
+      margin: 50px 0 40px;
+    }
+
+    h1 {
+      font-size: clamp(2.5rem, 8vw, 4rem);
+      font-weight: 900;
+      background: linear-gradient(to bottom, #fff 30%, #64748b);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      letter-spacing: -2px;
+      margin-bottom: 10px;
+    }
+
+    header p {
+      font-size: 1.1rem;
+      color: #94a3b8;
+      max-width: 600px;
+    }
+
+    .game-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 25px;
+      width: 100%;
+      max-width: 1300px;
+      padding: 20px;
+      margin-bottom: 60px;
+    }
+
+    .game-card {
+      position: relative;
+      background: var(--card-bg);
+      backdrop-filter: blur(15px);
+      -webkit-backdrop-filter: blur(15px);
+      border: 1px solid var(--card-border);
+      border-radius: 28px;
+      padding: 35px 20px;
+      text-align: center;
+      transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      overflow: hidden;
+    }
+
+    .game-card:hover {
+      transform: translateY(-10px);
+      border-color: rgba(255, 255, 255, 0.2);
+      background: rgba(255, 255, 255, 0.05);
+      box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+    }
+
+    .game-icon {
+      font-size: 3.5rem;
+      margin-bottom: 15px;
+      display: block;
+      transition: transform 0.3s ease;
+    }
+
+    .game-card:hover .game-icon {
+      transform: scale(1.2) rotate(3deg);
+    }
+
+    .game-card h2 {
+      font-size: 1.5rem;
+      margin-bottom: 10px;
+      color: #fff;
+    }
+
+    .game-card p {
+      font-size: 0.9rem;
+      color: #94a3b8;
+      line-height: 1.5;
+      margin-bottom: 25px;
+      flex-grow: 1;
+    }
+
+    .play-btn {
+      display: inline-block;
+      padding: 14px 28px;
+      background: rgba(255, 255, 255, 0.08);
+      color: #fff;
+      text-decoration: none;
+      font-weight: 700;
+      font-size: 0.9rem;
+      border-radius: 14px;
+      transition: all 0.3s ease;
+      border: 1px solid rgba(255,255,255,0.1);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .game-card:hover .play-btn {
+      background: #fff;
+      color: #000;
+      box-shadow: 0 0 20px rgba(255,255,255,0.3);
+    }
+
+    footer {
+      padding: 40px;
+      color: #475569;
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+    }
+
+    @media (max-width: 600px) {
+      .game-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>Endless Runs</h1>
+    <p>Endless Games. Infinite Fun. No Limits.</p>
+  </header>
+
+  <main class="game-grid">
+
+    <article class="game-card">
+      <div class="game-icon">🏐</div>
+      <h2>Catch The Ball</h2>
+      <p>Test your reflexes! Catch every falling ball and push your limits.</p>
+      <a href="Catch_the_ball.html" class="play-btn">Launch</a>
+    </article>
+
+    <article class="game-card">
+      <div class="game-icon">🚀</div>
+      <h2>Space Dodger</h2>
+      <p>Pilot through asteroid fields, collect stars, and survive the void.</p>
+      <a href="Space_dodger.html" class="play-btn">Launch</a>
+    </article>
+
+    <article class="game-card">
+      <div class="game-icon">🧟</div>
+      <h2>Zombie Shooter</h2>
+      <p>Aim fast, blast the undead, and survive the endless nightmare horde!</p>
+      <a href="Zombie_shooter.html" class="play-btn">Launch</a>
+    </article>
+
+    <article class="game-card">
+      <div class="game-icon">❌</div>
+      <h2>Tic Tac Toe</h2>
+      <p>Classic strategy. Outsmart the AI and claim three in a row.</p>
+      <a href="Tic_tac_toe.html" class="play-btn">Launch</a>
+    </article>
+    
+    <article class="game-card">
+      <div class="game-icon">🐦</div>
+      <h2>Flappy Bird</h2>
+      <p>Navigate through pipes with perfect timing. Collect coins and chase the score!</p>
+      <a href="Flappy_bird.html" class="play-btn">Launch</a>
+    </article>
+
+    <article class="game-card">
+      <div class="game-icon">🐤</div>
+      <h2>Chicken Dash</h2>
+      <p>Jump over the eggs and survive the farm frenzy in this fast dash!</p>
+      <a href="Chicken_dash.html" class="play-btn">Launch</a>
+    </article>
+
+    <article class="game-card">
+      <div class="game-icon">🐍</div>
+      <h2>Snake Evolution</h2>
+      <p>Grow longer, eat more, and avoid your own tail in this classic hit.</p>
+      <a href="Snake_game.html" class="play-btn">Launch</a>
+    </article>
+
+    <article class="game-card">
+      <div class="game-icon">🔢</div>
+      <h2>2048 Puzzle</h2>
+      <p>Merge the tiles and reach the legendary 2048. Pure strategy.</p>
+      <a href="2048.html" class="play-btn">Launch</a>
+    </article>
+
+    <article class="game-card">
+      <div class="game-icon">🎵</div>
+      <h2>Music Tiles</h2>
+      <p>Tap to the rhythm and hit the neon tiles. Don't miss a single beat!</p>
+      <a href="Music_tiles.html" class="play-btn">Launch</a>
+    </article>
+
+    <article class="game-card">
+      <div class="game-icon">⚓</div>
+      <h2>Neon Hook</h2>
+      <p>Master the grapple! Swing through tunnels with physics-based skill.</p>
+      <a href="Neon_hook.html" class="play-btn">Launch</a>
+    </article>
+
+    <article class="game-card">
+      <div class="game-icon">🚗</div>
+      <h2>Car Dodger</h2>
+      <p>Steer through heavy traffic and survive the high-speed highway.</p>
+      <a href="Car_dodger.html" class="play-btn">Launch</a>
+    </article>
+
+    <article class="game-card">
+      <div class="game-icon">🏓</div>
+      <h2>Ping Pong AI</h2>
+      <p>Smash the ball and outsmart the AI in this high-speed rally.</p>
+      <a href="Ping_pong.html" class="play-btn">Launch</a>
+    </article>
+
+    <article class="game-card">
+      <div class="game-icon">🧗</div>
+      <h2>Neon Leap</h2>
+      <p>Climb the platforms and jump to the stars. Don't look down!</p>
+      <a href="Neon_leap.html" class="play-btn">Launch</a>
+    </article>
+
+    <article class="game-card">
+      <div class="game-icon">🎴</div>
+      <h2>Memory Flip</h2>
+      <p>Test your brain! Flip the cards and find all the matching pairs.</p>
+      <a href="Memory_flip.html" class="play-btn">Launch</a>
+    </article>
+
+    <article class="game-card">
+      <div class="game-icon">🧱</div>
+      <h2>Neon Breaker</h2>
+      <p>Smash through bricks with your energy ball. Clear the board!</p>
+      <a href="Neon_braker.html" class="play-btn">Launch</a>
+    </article>
+
+    <article class="game-card">
+      <div class="game-icon">☁️</div>
+      <h2>Cloud Run</h2>
+      <p>Leap between obstacles and gather coins in a sky-high adventure.</p>
+      <a href="Cloud_run.html" class="play-btn">Launch</a>
+    </article>
+  </main>
+
+  <footer>
+    Made with ❤️ | Endless Runs &copy; 2026
+  </footer>
+
+</body>
+</html>
